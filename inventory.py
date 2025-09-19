@@ -3,10 +3,11 @@ import pandas as pd
 import requests
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 from sqlalchemy.types import Float, Integer, String, DateTime, Boolean, NVARCHAR
+import math
 import urllib
-from sqlalchemy import inspect
+
 pd.set_option('future.no_silent_downcasting', True)
 warnings.filterwarnings(
     "ignore",
@@ -25,79 +26,38 @@ def get_cookies_from_browser(url: str) -> dict:
     return cookies
 
 def auto_cast_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Безопасный автокастинг:
-    - не удаляет строки;
-    - преобразует целые/дробные/boolean;
-    - пытается распознать колонки с датами по доле успешного парсинга в сэмпле.
-    """
     if df is None or df.empty:
         return df
-    df = df.copy()  # явная копия, чтобы избежать SettingWithCopyWarning
-
+    df = df.copy()
     for col in df.columns:
-        s_all = df[col].dropna().astype(str)
-        if s_all.empty:
-            continue
+        # сначала пробуем числа без errors="ignore"
         try:
-            # boolean true/false
-            if s_all.str.lower().isin(['true', 'false']).all():
-                df.loc[:, col] = s_all.str.lower().map({'true': 1, 'false': 0}).astype('Int64')
-                continue
-
-            # целые числа (все значения колонки целые)
-            if s_all.str.fullmatch(r"\d+").all():
-                df.loc[:, col] = pd.to_numeric(s_all, downcast='integer', errors='coerce')
-                continue
-
-            # дробные числа
-            if s_all.str.fullmatch(r"\d+\.\d+").all():
-                df.loc[:, col] = pd.to_numeric(s_all, errors='coerce')
-                continue
-
-            # Датa: пробуем по сэмплу распознать, если >threshold парсится — приводим всю колонку
-            sample = s_all.head(100)  # смотрим первые 100 непустых значений
-            parsed = pd.to_datetime(sample, errors='coerce', dayfirst=True)
-            frac = parsed.notna().mean()  # доля успешно распарсенных в сэмпле
-            DATE_FRAC_THRESHOLD = 0.6
-            if frac >= DATE_FRAC_THRESHOLD:
-                # приводим всю колонку к datetime (errors='coerce' — не удаляем строки)
-                df.loc[:, col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
-                # не удаляем строки здесь!
-                continue
-
-            # иначе — оставляем как есть
-        except Exception:
-            # ничего не делаем — оставляем исходные значения
-            continue
-
+            df[col] = pd.to_numeric(df[col], downcast="integer")
+        except (ValueError, TypeError):
+            pass
+        # потом даты
+        if pd.api.types.is_object_dtype(df[col]):
+            try:
+                parsed = pd.to_datetime(df[col], errors="coerce", dayfirst=True)
+                if parsed.notna().mean() >= 0.6:
+                    df[col] = parsed
+            except Exception:
+                pass
     return df
+
 
 
 def fetch_inventory(data_url: str, cookies: dict) -> dict:
     print("⬇️ Загрузка inventory...")
-    r = requests.post(
-        data_url,
-        cookies=cookies,
-        json={},
-        headers={"Content-Type": "application/json"}
-    )
+    r = requests.post(data_url, cookies=cookies, json={}, headers={"Content-Type": "application/json"})
     r.raise_for_status()
     data = r.json()
-
-    # debug: сохранить/посчитать сколько элементов реально пришло
     items = data.get("inventory", [])
     print("📡 Всего элементов в inventory (raw):", len(items))
-
     if not items:
-        print("⚠️ Пустой ответ")
         return {}
-
     inv_df = pd.json_normalize(items, sep="_", max_level=1)
-    print("🔎 После json_normalize inv_df.shape:", inv_df.shape)
-    # при желании показать первые 5 колонок и первых 3 строк:
-    print("columns sample:", inv_df.columns[:10].tolist())
-    print(inv_df.head(3).to_dict(orient='records'))
+    print("🔎 После json_normalize:", inv_df.shape)
 
     groups_list, kinds_list, sectors_list = [], [], []
     for it in items:
@@ -126,6 +86,49 @@ UNIQUE_KEYS = {
     "inventory_sectors":["product_id", "sector_code"],
 }
 
+def build_dtype_map(df: pd.DataFrame, table_name: str) -> dict:
+    """
+    • bool → Boolean
+    • int  → Integer
+    • float → Float
+    • datetime → DateTime
+    • object/строки → String(n) (с расчётом длины)
+    • inventory_groups.group_code / type_code → NVARCHAR
+    """
+    dtype_map: dict[str, object] = {}
+
+    for col in df.columns:
+        s = df[col].dropna()
+        if s.empty:
+            # Пустая колонка — хотя бы String(50)
+            dtype_map[col] = String(50)
+            continue
+
+        # Спец-правило
+        if table_name == "inventory_groups" and col in ("group_code", "type_code"):
+            dtype_map[col] = NVARCHAR()
+            continue
+
+        # pandas dtype
+        dt = df[col].dtype
+
+        if pd.api.types.is_bool_dtype(dt):
+            dtype_map[col] = Boolean()
+        elif pd.api.types.is_integer_dtype(dt):
+            # Int64/Int32 → Integer
+            dtype_map[col] = Integer()
+        elif pd.api.types.is_float_dtype(dt):
+            dtype_map[col] = Float()
+        elif pd.api.types.is_datetime64_any_dtype(dt):
+            dtype_map[col] = DateTime()
+        else:
+            # текст: вычисляем максимальную длину, небольшой запас
+            max_len = s.astype(str).str.len().max()
+            size = max(50, math.ceil(max_len * 1.2))
+            dtype_map[col] = String(size)
+
+    return dtype_map
+
 def upload_to_sql(df_dict: dict):
     params = urllib.parse.quote_plus(
         "DRIVER={ODBC Driver 17 for SQL Server};"
@@ -143,32 +146,37 @@ def upload_to_sql(df_dict: dict):
                 print(f"⏭ {table_name} пуст – пропущено.")
                 continue
 
+            # приведение типов
             df = auto_cast_dataframe(df)
+
             keys = [k for k in UNIQUE_KEYS.get(table_name, []) if k in df.columns]
+
+            # 🔑 сначала строим карту типов – пока ключи ещё в «родном» dtype
+            dtype_map = build_dtype_map(df, table_name)
+
             if keys:
-                df[keys] = df[keys].fillna('').astype(str).apply(lambda x: x.str.strip())
+                # чистим пробелы только для текстовых ключей
+                for k in keys:
+                    if pd.api.types.is_string_dtype(df[k]):
+                        df[k] = df[k].str.strip()
                 df = df.drop_duplicates(subset=keys)
 
-            # принудительно NVARCHAR для всех текстовых полей
-            dtype_map = {}
-            for col in df.columns:
-                val = df[col].dropna().iloc[0] if not df[col].dropna().empty else None
-                if val is None: dtype_map[col] = NVARCHAR()   # ← юникод
-                elif isinstance(val, float): dtype_map[col] = Float()
-                elif isinstance(val, int): dtype_map[col] = Integer()
-                elif isinstance(val, bool): dtype_map[col] = Boolean()
-                elif hasattr(val, "year"): dtype_map[col] = DateTime()
-                else: dtype_map[col] = NVARCHAR()             # ← юникод
-
+            # --- загрузка ---
             if not inspector.has_table(table_name):
-                df.to_sql(table_name, con=conn, index=False,
-                          if_exists="replace", dtype=dtype_map)
+                df.to_sql(
+                    table_name,
+                    con=conn,
+                    index=False,
+                    if_exists="replace",
+                    dtype=dtype_map
+                )
                 print(f"🆕 {table_name} создана и загружено {len(df)} строк.")
                 continue
 
             if keys:
                 stg = f"{table_name}_stg"
-                df.to_sql(stg, con=conn, index=False, if_exists="replace", dtype=dtype_map)
+                df.to_sql(stg, con=conn, index=False,
+                          if_exists="replace", dtype=dtype_map)
                 on_clause = " AND ".join([f"t.[{k}] = s.[{k}]" for k in keys])
                 cols = [f"[{c}]" for c in df.columns]
                 insert_cols = ", ".join(cols)
@@ -184,8 +192,13 @@ DROP TABLE dbo.{stg};
                 conn.execute(text(merge_sql))
                 print(f"📥 {table_name} → добавлены только новые строки ({len(df)} проверено).")
             else:
-                df.to_sql(table_name, con=conn, index=False,
-                          if_exists="append", dtype=dtype_map)
+                df.to_sql(
+                    table_name,
+                    con=conn,
+                    index=False,
+                    if_exists="append",
+                    dtype=dtype_map
+                )
                 print(f"⚠️ {table_name}: нет ключей, добавлены все {len(df)} строк.")
 
 if __name__ == "__main__":
