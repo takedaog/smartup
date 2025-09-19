@@ -7,8 +7,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.types import Float, Integer, String, DateTime, Boolean, NVARCHAR
 import urllib
 from sqlalchemy import inspect
-
-# 🔇 глушим предупреждения pandas о формате дат
+pd.set_option('future.no_silent_downcasting', True)
 warnings.filterwarnings(
     "ignore",
     message="Could not infer format",
@@ -26,27 +25,54 @@ def get_cookies_from_browser(url: str) -> dict:
     return cookies
 
 def auto_cast_dataframe(df: pd.DataFrame) -> pd.DataFrame:
-    """Автокастинг + отбрасывание строк с невалидной датой."""
+    """
+    Безопасный автокастинг:
+    - не удаляет строки;
+    - преобразует целые/дробные/boolean;
+    - пытается распознать колонки с датами по доле успешного парсинга в сэмпле.
+    """
+    if df is None or df.empty:
+        return df
+    df = df.copy()  # явная копия, чтобы избежать SettingWithCopyWarning
+
     for col in df.columns:
-        s = df[col].dropna().astype(str)
+        s_all = df[col].dropna().astype(str)
+        if s_all.empty:
+            continue
         try:
-            if not s.empty and s.str.lower().isin(['true','false']).all():
-                df[col] = s.str.lower().map({'true':1,'false':0}).astype('Int64')
+            # boolean true/false
+            if s_all.str.lower().isin(['true', 'false']).all():
+                df.loc[:, col] = s_all.str.lower().map({'true': 1, 'false': 0}).astype('Int64')
                 continue
-            if not s.empty and s.str.fullmatch(r"\d+").all():
-                df[col] = pd.to_numeric(s, downcast='integer', errors='coerce')
+
+            # целые числа (все значения колонки целые)
+            if s_all.str.fullmatch(r"\d+").all():
+                df.loc[:, col] = pd.to_numeric(s_all, downcast='integer', errors='coerce')
                 continue
-            if not s.empty and s.str.fullmatch(r"\d+\.\d+").all():
-                df[col] = pd.to_numeric(s, errors='coerce')
+
+            # дробные числа
+            if s_all.str.fullmatch(r"\d+\.\d+").all():
+                df.loc[:, col] = pd.to_numeric(s_all, errors='coerce')
                 continue
-            # даты — невалидные строки убираем
-            dt = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
-            if dt.notna().any():
-                df[col] = dt
-                df = df[dt.notna()]  # ⚡ оставляем только корректные
+
+            # Датa: пробуем по сэмплу распознать, если >threshold парсится — приводим всю колонку
+            sample = s_all.head(100)  # смотрим первые 100 непустых значений
+            parsed = pd.to_datetime(sample, errors='coerce', dayfirst=True)
+            frac = parsed.notna().mean()  # доля успешно распарсенных в сэмпле
+            DATE_FRAC_THRESHOLD = 0.6
+            if frac >= DATE_FRAC_THRESHOLD:
+                # приводим всю колонку к datetime (errors='coerce' — не удаляем строки)
+                df.loc[:, col] = pd.to_datetime(df[col], errors='coerce', dayfirst=True)
+                # не удаляем строки здесь!
+                continue
+
+            # иначе — оставляем как есть
         except Exception:
-            pass
+            # ничего не делаем — оставляем исходные значения
+            continue
+
     return df
+
 
 def fetch_inventory(data_url: str, cookies: dict) -> dict:
     print("⬇️ Загрузка inventory...")
@@ -58,12 +84,21 @@ def fetch_inventory(data_url: str, cookies: dict) -> dict:
     )
     r.raise_for_status()
     data = r.json()
+
+    # debug: сохранить/посчитать сколько элементов реально пришло
     items = data.get("inventory", [])
+    print("📡 Всего элементов в inventory (raw):", len(items))
+
     if not items:
         print("⚠️ Пустой ответ")
         return {}
 
     inv_df = pd.json_normalize(items, sep="_", max_level=1)
+    print("🔎 После json_normalize inv_df.shape:", inv_df.shape)
+    # при желании показать первые 5 колонок и первых 3 строк:
+    print("columns sample:", inv_df.columns[:10].tolist())
+    print(inv_df.head(3).to_dict(orient='records'))
+
     groups_list, kinds_list, sectors_list = [], [], []
     for it in items:
         pid = it.get("product_id")
