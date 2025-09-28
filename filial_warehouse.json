@@ -7,18 +7,32 @@
     "warehouse_name": "MARKAZ"
   },
   {
+    "filial_id": 9161160,
+    "filial_code": "9161160",
+    "warehouse_id": 69166,
+    "warehouse_code": "OfficeEPCO",
+    "warehouse_name": "OfficeEPCO"
+  },
+  {
+    "filial_id": 9161160,
+    "filial_code": "9161160",
+    "warehouse_id": 69165,
+    "warehouse_code": "VodiyEPCO",
+    "warehouse_name": "VodiyEPCO"
+  },
+  {
+    "filial_id": 9161160,
+    "filial_code": "9161160",
+    "warehouse_id": 68345,
+    "warehouse_code": "БракCклад",
+    "warehouse_name": "БракCклад"
+  },
+  {
     "filial_id": 9161176,
     "filial_code": "9161176",
     "warehouse_id": 65462,
     "warehouse_code": "ToshkentSklad",
     "warehouse_name": "ToshkentSklad"
-  },
-  {
-    "filial_id": 9161176,
-    "filial_code": "9161176",
-    "warehouse_id": 67725,
-    "warehouse_code": "БракCкладT",
-    "warehouse_name": "БракCкладT"
   },
   {
     "filial_id": 9161277,
