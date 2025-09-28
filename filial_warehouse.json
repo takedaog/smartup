@@ -1,8 +1,128 @@
-version https://git-lfs.github.com/spec/v1
-<<<<<<< HEAD
-oid sha256:7c77586c66853057efa7b8247dcd1f54687cc63670722df850ac7e1b982e9bb8
-size 3247
-=======
-oid sha256:c95071fa32316915b9733e8e5afae5c385468a6e79d1a74804e58ba31953dc26
-size 3827
->>>>>>> ecf2bb909876df5c5d1018c65d0b3098ceb3a4cb
+[
+  {
+    "filial_id": 9161160,
+    "filial_code": "9161160",
+    "warehouse_id": 65461,
+    "warehouse_code": "MARKAZ",
+    "warehouse_name": "MARKAZ"
+  },
+  {
+    "filial_id": 9161176,
+    "filial_code": "9161176",
+    "warehouse_id": 65462,
+    "warehouse_code": "ToshkentSklad",
+    "warehouse_name": "ToshkentSklad"
+  },
+  {
+    "filial_id": 9161176,
+    "filial_code": "9161176",
+    "warehouse_id": 67725,
+    "warehouse_code": "БракCкладT",
+    "warehouse_name": "БракCкладT"
+  },
+  {
+    "filial_id": 9161277,
+    "filial_code": "9161277",
+    "warehouse_id": 65478,
+    "warehouse_code": "KokandBaxromali",
+    "warehouse_name": "KokandBaxromali"
+  },
+  {
+    "filial_id": 9161277,
+    "filial_code": "9161277",
+    "warehouse_id": 69167,
+    "warehouse_code": "KokandMastona",
+    "warehouse_name": "KokandMastona"
+  },
+  {
+    "filial_id": 9161280,
+    "filial_code": "9161280",
+    "warehouse_id": 65479,
+    "warehouse_code": "AndijonCклад",
+    "warehouse_name": "AndijonCклад"
+  },
+  {
+    "filial_id": 9161283,
+    "filial_code": "9161283",
+    "warehouse_id": 65480,
+    "warehouse_code": "NamanganCклад",
+    "warehouse_name": "NamanganCклад"
+  },
+  {
+    "filial_id": 9161286,
+    "filial_code": "9161286",
+    "warehouse_id": 65481,
+    "warehouse_code": "SamarqandSklad",
+    "warehouse_name": "SamarqandSklad"
+  },
+  {
+    "filial_id": 9161295,
+    "filial_code": "9161295",
+    "warehouse_id": 65482,
+    "warehouse_code": "FargonaCклад",
+    "warehouse_name": "FargonaCклад"
+  },
+  {
+    "filial_id": 9161297,
+    "filial_code": "9161297",
+    "warehouse_id": 65484,
+    "warehouse_code": "JizzaxSklad",
+    "warehouse_name": "JizzaxSklad"
+  },
+  {
+    "filial_id": 9161298,
+    "filial_code": "9161298",
+    "warehouse_id": 65485,
+    "warehouse_code": "SurxandaryoCклад",
+    "warehouse_name": "SurxandaryoCклад"
+  },
+  {
+    "filial_id": 9161304,
+    "filial_code": "9161304",
+    "warehouse_id": 65486,
+    "warehouse_code": "SirdaryoCклад",
+    "warehouse_name": "SirdaryoCклад"
+  },
+  {
+    "filial_id": 9161309,
+    "filial_code": "9161309",
+    "warehouse_id": 65487,
+    "warehouse_code": "QarshiSklad",
+    "warehouse_name": "QarshiSklad"
+  },
+  {
+    "filial_id": 9161309,
+    "filial_code": "9161309",
+    "warehouse_id": 69168,
+    "warehouse_code": "ShahrisabzSklad",
+    "warehouse_name": "ShahrisabzSklad"
+  },
+  {
+    "filial_id": 9161311,
+    "filial_code": "9161311",
+    "warehouse_id": 65488,
+    "warehouse_code": "NavoiCклад",
+    "warehouse_name": "NavoiCклад"
+  },
+  {
+    "filial_id": 9161321,
+    "filial_code": "9161321",
+    "warehouse_id": 65490,
+    "warehouse_code": "XorazmCклад",
+    "warehouse_name": "XorazmCклад"
+  },
+  {
+    "filial_id": 9161316,
+    "filial_code": "9161316",
+    "warehouse_id": 65489,
+    "warehouse_code": "BuxoroCклад",
+    "warehouse_name": "BuxoroCклад"
+  },
+  {
+    "filial_id": 9161336,
+    "filial_code": "9161336",
+    "warehouse_id": 65491,
+    "warehouse_code": "Qoraqalpog'istonCклад",
+    "warehouse_name": "Qoraqalpog'istonCклад"
+  }
+]
